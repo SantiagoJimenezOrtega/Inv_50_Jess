@@ -1184,20 +1184,67 @@ function initMusicDropzone() {
 
 /* ── Upload unificado → /api/upload ── */
 async function uploadToServer(file, onProgress) {
-  // Importa la librería cliente de Vercel Blob directo desde CDN.
-  // El archivo va del navegador → Vercel Blob sin pasar por la función
-  // serverless, evitando el límite de 4.5 MB.
-  const { upload } = await import('https://esm.sh/@vercel/blob/client');
+  const filename    = `uploads/${Date.now()}-${file.name}`;
+  const callbackUrl = `${window.location.origin}/api/upload`;
 
-  const blob = await upload(file.name, file, {
-    access:          'public',
-    handleUploadUrl: '/api/upload',
-    onUploadProgress: ({ percentage }) => {
-      if (onProgress) onProgress(Math.round(percentage));
-    },
+  // Paso 1: pedir token al servidor
+  const tokenRes = await fetch('/api/upload', {
+    method:  'POST',
+    headers: { 'content-type': 'application/json' },
+    body:    JSON.stringify({
+      type:    'blob.generate-client-token',
+      payload: { pathname: filename, callbackUrl, multipart: false, clientPayload: null },
+    }),
   });
 
-  return blob.url;
+  if (!tokenRes.ok) {
+    const err = await tokenRes.json().catch(() => ({ error: `HTTP ${tokenRes.status}` }));
+    throw new Error(err.error || `Error ${tokenRes.status} al obtener token`);
+  }
+
+  const { clientToken } = await tokenRes.json();
+  if (!clientToken) throw new Error('El servidor no devolvió un token válido');
+
+  // Paso 2: subir el archivo directo a Vercel Blob con XHR (para tener progreso)
+  const blobUrl = await new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', `https://blob.vercel-storage.com/${filename}`);
+    xhr.setRequestHeader('authorization', `Bearer ${clientToken}`);
+    xhr.setRequestHeader('x-api-version',  '7');
+    xhr.setRequestHeader('content-type',   file.type || 'application/octet-stream');
+
+    xhr.upload.addEventListener('progress', e => {
+      if (e.lengthComputable && onProgress) onProgress(Math.round(e.loaded / e.total * 100));
+    });
+    xhr.addEventListener('load', () => {
+      if (xhr.status < 400) {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          resolve(data.url || data.downloadUrl || data.contentUrl);
+        } catch {
+          resolve(null);
+        }
+      } else {
+        reject(new Error(`Blob upload error ${xhr.status}: ${xhr.responseText}`));
+      }
+    });
+    xhr.addEventListener('error', () => reject(new Error('Error de red al subir el archivo')));
+    xhr.send(file);
+  });
+
+  // Paso 3: notificar al servidor que el upload completó (best-effort)
+  if (blobUrl) {
+    fetch('/api/upload', {
+      method:  'POST',
+      headers: { 'content-type': 'application/json' },
+      body:    JSON.stringify({
+        type:    'blob.upload-completed',
+        payload: { blob: { url: blobUrl, pathname: filename }, tokenPayload: null },
+      }),
+    }).catch(() => {});
+  }
+
+  return blobUrl;
 }
 
 /* ── Audio: archivo seleccionado / soltado ── */
