@@ -350,6 +350,20 @@
     #music-result-actions button:hover{border-color:var(--c-gold);color:var(--c-gold)}
     #btn-clear-music:hover{border-color:#c44!important;color:#c44!important}
     details summary::-webkit-details-marker{color:var(--c-gold-dim)}
+
+    /* ── Section visibility toggles ── */
+    .ep-section-toggle{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid #1e1e1e}
+    .ep-section-toggle:last-child{border-bottom:none}
+    .ep-toggle-info{flex:1}
+    .ep-toggle-name{font-family:var(--font-body);font-size:16px;color:var(--c-text-mid)}
+    .ep-toggle-name small{display:block;font-family:var(--font-title);font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--c-text-muted);margin-top:2px}
+    .ep-toggle{position:relative;width:42px;height:24px;flex-shrink:0;margin-left:12px}
+    .ep-toggle input{opacity:0;width:0;height:0;position:absolute}
+    .ep-toggle-slider{position:absolute;inset:0;background:#222;border:1px solid #333;cursor:pointer;transition:background .25s,border-color .25s}
+    .ep-toggle-slider::before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:#555;transition:transform .25s,background .25s}
+    .ep-toggle input:checked + .ep-toggle-slider{background:rgba(201,168,76,.15);border-color:var(--c-gold)}
+    .ep-toggle input:checked + .ep-toggle-slider::before{transform:translateX(18px);background:var(--c-gold)}
+    .ep-section-toggle.is-hidden .ep-toggle-name{opacity:.45}
   </style>
 </head>
 <body>
@@ -994,6 +1008,7 @@ function renderContent() {
   document.getElementById('cierre-firma-nombre').textContent = c.cierreNombre;
   document.getElementById('cierre-firma-sub').textContent = c.cierreSub;
   document.getElementById('footer-text').textContent = c.footerText;
+  applyVisibility();
 }
 
 function renderGallery() {
@@ -1037,6 +1052,46 @@ function renderEventCards() {
 function setMeta(prop, val) {
   const el = document.querySelector(`meta[property="${prop}"]`);
   if (el) el.setAttribute('content', val);
+}
+
+/* ── Section visibility ── */
+const SECTIONS = [
+  { id: 'intro-text',        name: 'Entrada animada',      sub: 'Cortina + texto animado' },
+  { id: 'hero',              name: 'Foto principal',        sub: 'Retrato del homenajeado' },
+  { id: 'invitation',        name: 'Invitación formal',     sub: 'Texto de invitación' },
+  { id: 'historia',          name: 'Historia / Legado',     sub: 'Foto + texto biográfico' },
+  { id: 'galeria',           name: 'Galería de fotos',      sub: 'Carrusel infinito' },
+  { id: 'countdown-section', name: 'Cuenta regresiva',      sub: 'Timer hasta el evento' },
+  { id: 'detalles',          name: 'Detalles del evento',   sub: 'Fecha, hora, lugar' },
+  { id: 'dresscode',         name: 'Dress Code',            sub: 'Código de vestimenta' },
+  { id: 'rsvp',              name: 'RSVP',                  sub: 'Confirmación de asistencia' },
+  { id: 'qr-section',        name: 'Código QR',             sub: 'Galería de fotos del evento' },
+  { id: 'cierre',            name: 'Cierre / Firma',        sub: 'Cita y firma final' },
+];
+
+function applyVisibility() {
+  const hidden = new Set(siteContent.hiddenSections || []);
+
+  // Reset all sections and separators
+  document.querySelectorAll('section').forEach(s => s.style.display = '');
+  document.querySelectorAll('.deco-separator, .deco-separator-lg').forEach(s => s.style.display = '');
+
+  // Hide selected sections + preceding separator
+  hidden.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = 'none';
+    // Walk backwards and hide the first separator we find
+    let prev = el.previousElementSibling;
+    while (prev) {
+      if (prev.classList.contains('deco-separator') || prev.classList.contains('deco-separator-lg')) {
+        prev.style.display = 'none';
+        break;
+      }
+      if (prev.tagName === 'SECTION') break;
+      prev = prev.previousElementSibling;
+    }
+  });
 }
 
 function esc(str) {
@@ -1343,6 +1398,7 @@ function initEditor() {
   buildGalleryEditor();
   buildEventCardsEditor();
   initMusicDropzone();
+  buildVisibilityEditor();
 
   // Bind simple data-key fields
   document.querySelectorAll('[data-key]').forEach(el => {
@@ -1489,6 +1545,45 @@ function editorUpdateCard(idx, field, val) {
 }
 
 /* toggle panel */
+/* ── Visibility editor ── */
+function buildVisibilityEditor() {
+  const list   = document.getElementById('ep-sections-list');
+  const hidden = new Set(siteContent.hiddenSections || []);
+  list.innerHTML = '';
+
+  SECTIONS.forEach(sec => {
+    const isVisible = !hidden.has(sec.id);
+    const row = document.createElement('div');
+    row.className = 'ep-section-toggle' + (isVisible ? '' : ' is-hidden');
+    row.id = `ep-sec-row-${sec.id}`;
+    row.innerHTML = `
+      <div class="ep-toggle-info">
+        <span class="ep-toggle-name">
+          ${sec.name}
+          <small>${sec.sub}</small>
+        </span>
+      </div>
+      <label class="ep-toggle" title="${isVisible ? 'Ocultar sección' : 'Mostrar sección'}">
+        <input type="checkbox" ${isVisible ? 'checked' : ''}
+          onchange="editorToggleSection('${sec.id}', this.checked, this.closest('.ep-section-toggle'))" />
+        <span class="ep-toggle-slider"></span>
+      </label>`;
+    list.appendChild(row);
+  });
+}
+
+function editorToggleSection(id, visible, rowEl) {
+  if (!siteContent.hiddenSections) siteContent.hiddenSections = [];
+  if (visible) {
+    siteContent.hiddenSections = siteContent.hiddenSections.filter(s => s !== id);
+    rowEl.classList.remove('is-hidden');
+  } else {
+    if (!siteContent.hiddenSections.includes(id)) siteContent.hiddenSections.push(id);
+    rowEl.classList.add('is-hidden');
+  }
+  applyVisibility();
+}
+
 function toggleEditorPanel() {
   editorPanelOpen = !editorPanelOpen;
   document.getElementById('editor-panel').classList.toggle('open', editorPanelOpen);
@@ -1537,6 +1632,7 @@ function editorReset() {
   populateEditorFields();
   buildGalleryEditor();
   buildEventCardsEditor();
+  buildVisibilityEditor();
   renderContent();
   showToast('◆ Valores restaurados');
 }
