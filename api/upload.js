@@ -1,21 +1,18 @@
-import { put } from '@vercel/blob';
-
-export const config = {
-  api: { bodyParser: false },
-};
+import { handleUpload } from '@vercel/blob/client';
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  const raw      = req.headers['x-filename'] ?? `upload-${Date.now()}`;
-  const filename = decodeURIComponent(raw);
-
   try {
-    const blob = await put(filename, req, { access: 'public' });
-    return res.status(200).json({ url: blob.url });
+    const body = await handleUpload({
+      body:    req.body,
+      request: req,
+      onBeforeGenerateToken: async () => ({
+        allowedContentTypes: ['image/*', 'audio/*', 'video/*'],
+        maximumSizeInBytes:  150 * 1024 * 1024, // 150 MB
+      }),
+      onUploadCompleted: async () => {},
+    });
+    return res.json(body);
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    return res.status(400).json({ error: err.message });
   }
 }

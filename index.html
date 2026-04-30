@@ -1184,27 +1184,20 @@ function initMusicDropzone() {
 
 /* ── Upload unificado → /api/upload ── */
 async function uploadToServer(file, onProgress) {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/api/upload');
-    xhr.setRequestHeader('x-filename', encodeURIComponent(file.name));
-    xhr.setRequestHeader('content-type', file.type);
+  // Importa la librería cliente de Vercel Blob directo desde CDN.
+  // El archivo va del navegador → Vercel Blob sin pasar por la función
+  // serverless, evitando el límite de 4.5 MB.
+  const { upload } = await import('https://esm.sh/@vercel/blob/client');
 
-    if (onProgress) {
-      xhr.upload.addEventListener('progress', e => {
-        if (e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100));
-      });
-    }
-    xhr.addEventListener('load', () => {
-      if (xhr.status === 200) {
-        resolve(JSON.parse(xhr.responseText).url);
-      } else {
-        reject(new Error(`Error ${xhr.status}`));
-      }
-    });
-    xhr.addEventListener('error', () => reject(new Error('Error de red')));
-    xhr.send(file);
+  const blob = await upload(file.name, file, {
+    access:          'public',
+    handleUploadUrl: '/api/upload',
+    onUploadProgress: ({ percentage }) => {
+      if (onProgress) onProgress(Math.round(percentage));
+    },
   });
+
+  return blob.url;
 }
 
 /* ── Audio: archivo seleccionado / soltado ── */
