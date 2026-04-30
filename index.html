@@ -407,6 +407,7 @@
     <button class="ep-tab" data-tab="evento">Evento</button>
     <button class="ep-tab" data-tab="galeria">Galería</button>
     <button class="ep-tab" data-tab="contacto">RSVP</button>
+    <button class="ep-tab" data-tab="secciones">Secciones</button>
   </div>
 
   <div class="ep-body">
@@ -624,6 +625,14 @@
         <label>URL que apunta el QR (carpeta de fotos, etc.)</label>
         <input type="url" data-key="qrUrl" placeholder="https://drive.google.com/…" />
       </div>
+    </div>
+
+    <!-- TAB: SECCIONES -->
+    <div class="ep-pane" id="ep-pane-secciones">
+      <p class="ep-hint" style="margin-bottom:18px;padding:0">
+        Activa o desactiva cada sección. Los cambios se aplican al guardar.
+      </p>
+      <div id="ep-sections-list"></div>
     </div>
 
   </div><!-- /ep-body -->
@@ -877,6 +886,7 @@ const DEFAULT_CONTENT = {
   cierreSub:         'La Familia',
   footerText:        '© 2025 · Con amor · Hecho para una noche que nunca olvidaremos',
   musicUrl:          'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+  hiddenSections:    [],
 };
 
 /* ════════════════════════════════════════════════════════
